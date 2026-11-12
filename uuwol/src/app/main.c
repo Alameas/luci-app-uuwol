@@ -8,6 +8,7 @@
 #include <libubox/uloop.h>
 
 #include "../common/argv.h"
+#include "../net/refresh.h"
 #include "../runtime/log.h"
 
 int main(int argc, char **argv)
@@ -15,6 +16,7 @@ int main(int argc, char **argv)
 	struct uu_cli config;
 	char mac[18];
 	char hostname[256];
+	struct uu_lease_refresher refresher;
 
 	uu_log_open();
 	if (uu_cli_parse(argc, argv, &config)) {
@@ -37,8 +39,17 @@ int main(int argc, char **argv)
 
 	UU_LOG_NOTICE("started mac=%s iface=%s model=%s hostname=%s refresh=%u\n",
 		      mac, config.iface, config.model, hostname, config.refresh_interval);
+	if (uu_lease_refresher_init(&refresher, config.iface,
+				    config.refresh_interval, NULL, NULL)) {
+		UU_LOG_ERR("could not initialize dhcp refresher\n");
+		uu_log_close();
+		return 1;
+	}
+
 	uloop_init();
+	uu_lease_refresher_start(&refresher);
 	uloop_run();
+	uu_lease_refresher_stop(&refresher);
 	uloop_done();
 	uu_log_close();
 	return 0;
