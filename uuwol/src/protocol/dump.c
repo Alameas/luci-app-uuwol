@@ -8,8 +8,8 @@
 
 #include "../runtime/log.h"
 #include "dump.h"
+#include "helper.h"
 #include "type.h"
-#include "uu.pb-c.h"
 
 static const char *message_name(uint32_t type)
 {
@@ -34,24 +34,6 @@ static const char *message_name(uint32_t type)
 	case UU_MESSAGE_WOL_REPLY: return "WolReply";
 	case UU_MESSAGE_REMOTE_LINK_CONFIG: return "RemoteLinkConfig";
 	default: return "Unknown";
-	}
-}
-
-static const ProtobufCMessageDescriptor *message_descriptor(uint32_t type)
-{
-	switch (type) {
-	case UU_MESSAGE_ECHO: return &uu__echo__descriptor;
-	case UU_MESSAGE_ECHO_REPLY: return &uu__echo_reply__descriptor;
-	case UU_MESSAGE_CONNECT: return &uu__connect__descriptor;
-	case UU_MESSAGE_ACC: return &uu__acc__descriptor;
-	case UU_MESSAGE_ACC_REPLY: return &uu__acc_reply__descriptor;
-	case UU_MESSAGE_STOP_ACC: return &uu__stop_acc__descriptor;
-	case UU_MESSAGE_DEVICE_LIST: return &uu__device_list__descriptor;
-	case UU_MESSAGE_CHECK_BOUND: return &uu__check_bound__descriptor;
-	case UU_MESSAGE_CHECK_BOUND_REPLY: return &uu__check_bound_reply__descriptor;
-	case UU_MESSAGE_WOL: return &uu__wol__descriptor;
-	case UU_MESSAGE_WOL_REPLY: return &uu__wol_reply__descriptor;
-	default: return NULL;
 	}
 }
 
@@ -299,7 +281,7 @@ static void dump_message_fields(const ProtobufCMessage *message, unsigned depth)
 void uu_message_dump(uint32_t type, const char *direction,
 			     const uint8_t *body, size_t body_len)
 {
-	const ProtobufCMessageDescriptor *descriptor = message_descriptor(type);
+	const ProtobufCMessageDescriptor *descriptor = uu_message_descriptor(type);
 	ProtobufCMessage *message;
 
 	UU_LOG_INFO("message direction=%s type=%u name=%s body_len=%zu\n",
@@ -309,12 +291,12 @@ void uu_message_dump(uint32_t type, const char *direction,
 		return;
 	}
 
-	message = protobuf_c_message_unpack(descriptor, NULL, body_len, body);
+	message = uu_message_unpack(type, body, body_len);
 	if (!message) {
 		UU_LOG_INFO("message type=%u parse=failed\n", type);
 		dump_wire_fields(body, body_len);
 		return;
 	}
 	dump_message_fields(message, 0);
-	protobuf_c_message_free_unpacked(message, NULL);
+	uu_message_free(message);
 }

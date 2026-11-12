@@ -8,7 +8,10 @@
 #include <string.h>
 #include <time.h>
 
+#include <libubox/utils.h>
+
 #include "../protocol/dump.h"
+#include "../protocol/helper.h"
 #include "../protocol/message.h"
 #include "../protocol/type.h"
 #include "../protocol/uu.pb-c.h"
@@ -19,20 +22,6 @@
 
 static int session_send(struct uu_session *session, uint8_t *frame,
 			 size_t frame_length);
-
-static void session_copy_device(struct uu_message_device *target,
-					const Uu__Device *source)
-{
-	memset(target, 0, sizeof(*target));
-	if (!source) return;
-	target->has_ip = source->has_ip != 0;
-	target->ip = source->ip;
-	target->mac = source->mac;
-	target->hostname = source->hostname;
-	target->type = source->type;
-	target->has_online = source->has_online != 0;
-	target->online = source->online != 0;
-}
 
 static int session_send_check_bound(struct uu_session *session)
 {
@@ -113,18 +102,18 @@ static int session_send_device_list(struct uu_session *session)
 	if (session->leases->count > SIZE_MAX / sizeof(*devices) ||
 	    session->leases->count > SIZE_MAX / sizeof(*mac_text))
 		return -1;
-	devices = calloc(session->leases->count, sizeof(*devices));
-	mac_text = calloc(session->leases->count, sizeof(*mac_text));
-	if ((session->leases->count && !devices) ||
-	    (session->leases->count && !mac_text)) {
-		free(devices);
-		free(mac_text);
-		return -1;
+	if (session->leases->count) {
+		devices = calloc_a(session->leases->count * sizeof(*devices),
+				   &mac_text,
+				   session->leases->count * sizeof(*mac_text));
+		if (!devices) return -1;
+	} else {
+		devices = NULL;
+		mac_text = NULL;
 	}
 	for (size_t i = 0; i < session->leases->count; i++) {
 		if (!ether_ntoa_r(&session->leases->entries[i].mac, mac_text[i])) {
 			free(devices);
-			free(mac_text);
 			return -1;
 		}
 		devices[i].has_ip = true;
@@ -137,7 +126,6 @@ static int session_send_device_list(struct uu_session *session)
 	}
 	if (clock_gettime(CLOCK_REALTIME, &now)) {
 		free(devices);
-		free(mac_text);
 		return -1;
 	}
 	list.mid = session->config.mid;
@@ -150,7 +138,6 @@ static int session_send_device_list(struct uu_session *session)
 						UU_SESSION_MAX_FRAME, &frame,
 						&frame_length);
 	free(devices);
-	free(mac_text);
 	if (result) return -1;
 	return session_send(session, frame, frame_length);
 }
@@ -205,6 +192,20 @@ static int session_send(struct uu_session *session, uint8_t *frame,
 	return session_flush(session);
 }
 
+static void session_copy_device(struct uu_message_device *target,
+					const Uu__Device *source)
+{
+	memset(target, 0, sizeof(*target));
+	if (!source) return;
+	target->has_ip = source->has_ip != 0;
+	target->ip = source->ip;
+	target->mac = source->mac;
+	target->hostname = source->hostname;
+	target->type = source->type;
+	target->has_online = source->has_online != 0;
+	target->online = source->online != 0;
+}
+
 static int session_handle_acc(struct uu_session *session,
 				      const uint8_t *body, size_t body_length)
 {
@@ -214,14 +215,14 @@ static int session_handle_acc(struct uu_session *session,
 	size_t frame_length;
 	int result;
 
-	message = uu__acc__unpack(NULL, body_length, body);
+	message = (Uu__Acc *)uu_message_unpack(UU_MESSAGE_ACC, body, body_length);
 	if (!message) return -1;
 	session_copy_device(&device, message->deviceinfo);
 	result = uu_message_encode_acc_reply(message->mid,
 					     message->deviceinfo ? &device : NULL,
 					     0, UU_SESSION_MAX_FRAME, &frame,
 					     &frame_length);
-	uu__acc__free_unpacked(message, NULL);
+	uu_message_free(&message->base);
 	if (result) return -1;
 	return session_send(session, frame, frame_length);
 }
@@ -238,11 +239,11 @@ static int session_handle_wol(struct uu_session *session,
 	bool success = false;
 	int result;
 
-	message = uu__wol__unpack(NULL, body_length, body);
+	message = (Uu__Wol *)uu_message_unpack(UU_MESSAGE_WOL, body, body_length);
 	if (!message) return -1;
 	session_copy_device(&device, message->deviceinfo);
-	if (message->deviceinfo && message->deviceinfo->mac &&
-	    ether_aton_r(message->deviceinfo->mac, &target)) {
+	if (message->deviceinfo && device.mac &&
+	    ether_aton_r(device.mac, &target)) {
 		success = uu_wol_send_all(&target, session->config.iface,
 					  &wol_result) == 0;
 	} else {
@@ -252,7 +253,7 @@ static int session_handle_wol(struct uu_session *session,
 					     message->deviceinfo ? &device : NULL,
 					     success, UU_SESSION_MAX_FRAME, &frame,
 					     &frame_length);
-	uu__wol__free_unpacked(message, NULL);
+	uu_message_free(&message->base);
 	if (result) return -1;
 	return session_send(session, frame, frame_length);
 }
