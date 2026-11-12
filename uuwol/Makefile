@@ -7,16 +7,20 @@ PKG_VERSION:=0.1.0
 PKG_RELEASE:=1
 PKG_LICENSE:=GPL-3.0-only
 
+UU_CA_FILE?=/etc/ssl/certs/ca-certificates.crt
+
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 
 include $(INCLUDE_DIR)/package.mk
+
+TARGET_CPPFLAGS += -DUU_TLS_CA_FILE=\"$(UU_CA_FILE)\"
 
 UU_SOURCES:=$(wildcard $(CURDIR)/src/*/*.c) $(wildcard $(CURDIR)/src/*/*/*.c)
 
 define Package/uuwol
   SECTION:=net
   CATEGORY:=Network
-  DEPENDS:=+libubox +libubus +libuci +libjson-c +libprotobuf-c +rpcd-mod-luci
+  DEPENDS:=+libubox +libubus +libuci +libmbedtls +libjson-c +libprotobuf-c +rpcd-mod-luci
   TITLE:=UU Wake on LAN client
   URL:=https://uu.163.com
 endef
@@ -35,7 +39,8 @@ define Build/Compile
 		-I$(CURDIR)/src -I$(PKG_BUILD_DIR)/src \
 		$(TARGET_LDFLAGS) -o $(PKG_BUILD_DIR)/uuwol \
 		$(UU_SOURCES) \
-		-lubox -lubus -luci -ljson-c -lprotobuf-c
+		-lubox -lubus -luci -lmbedtls -lmbedx509 -lmbedcrypto \
+		-ljson-c -lprotobuf-c
 endef
 
 define Package/uuwol/conffiles
