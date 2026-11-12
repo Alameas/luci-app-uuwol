@@ -205,18 +205,6 @@ static int session_send(struct uu_session *session, uint8_t *frame,
 	return session_flush(session);
 }
 
-static bool session_has_mac(const struct uu_session *session,
-				const struct ether_addr *target)
-{
-	if (!session->leases) return false;
-	for (size_t i = 0; i < session->leases->count; i++) {
-		if (!memcmp(&session->leases->entries[i].mac, target, sizeof(*target))) {
-			return true;
-		}
-	}
-	return false;
-}
-
 static int session_handle_acc(struct uu_session *session,
 				      const uint8_t *body, size_t body_length)
 {
@@ -254,12 +242,11 @@ static int session_handle_wol(struct uu_session *session,
 	if (!message) return -1;
 	session_copy_device(&device, message->deviceinfo);
 	if (message->deviceinfo && message->deviceinfo->mac &&
-	    ether_aton_r(message->deviceinfo->mac, &target) &&
-	    session_has_mac(session, &target)) {
+	    ether_aton_r(message->deviceinfo->mac, &target)) {
 		success = uu_wol_send_all(&target, session->config.iface,
 					  &wol_result) == 0;
 	} else {
-		UU_LOG_WARN("wol target rejected by lease snapshot\n");
+		UU_LOG_WARN("wol target has invalid mac\n");
 	}
 	result = uu_message_encode_wol_reply(message->mid, NULL, NULL,
 					     message->deviceinfo ? &device : NULL,
