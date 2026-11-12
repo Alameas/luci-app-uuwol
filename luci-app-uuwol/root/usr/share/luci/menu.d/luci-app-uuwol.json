@@ -1,0 +1,13 @@
+{
+	"admin/services/uuwol": {
+		"title": "UU WOL",
+		"action": {
+			"type": "view",
+			"path": "uuwol"
+		},
+		"depends": {
+			"acl": [ "luci-app-uuwol" ],
+			"uci": { "uuwol": true }
+		}
+	}
+}
