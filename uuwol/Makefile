@@ -16,7 +16,7 @@ UU_SOURCES:=$(wildcard $(CURDIR)/src/*/*.c) $(wildcard $(CURDIR)/src/*/*/*.c)
 define Package/uuwol
   SECTION:=net
   CATEGORY:=Network
-  DEPENDS:=+libubox +libubus +libuci +libjson-c +libprotobuf-c
+  DEPENDS:=+libubox +libubus +libuci +libjson-c +libprotobuf-c +rpcd-mod-luci
   TITLE:=UU Wake on LAN client
   URL:=https://uu.163.com
 endef
