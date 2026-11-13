@@ -161,12 +161,24 @@ static int session_flush(struct uu_session *session)
 	return 0;
 }
 
+static uint32_t session_frame_type(const uint8_t *frame)
+{
+	return ((uint32_t)frame[4] << 24) |
+	       ((uint32_t)frame[5] << 16) |
+	       ((uint32_t)frame[6] << 8) |
+	       (uint32_t)frame[7];
+}
+
 static int session_send(struct uu_session *session, uint8_t *frame,
 			 size_t frame_length)
 {
 	uint8_t *pending;
 
 	if (!session || !frame || !frame_length) {
+		free(frame);
+		return -1;
+	}
+	if (frame_length < 8) {
 		free(frame);
 		return -1;
 	}
@@ -189,6 +201,8 @@ static int session_send(struct uu_session *session, uint8_t *frame,
 	session->pending = pending;
 	memcpy(session->pending + session->pending_length, frame, frame_length);
 	session->pending_length += frame_length;
+	uu_message_dump(session_frame_type(frame), "out", frame + 8,
+			frame_length - 8);
 	free(frame);
 	return session_flush(session);
 }
