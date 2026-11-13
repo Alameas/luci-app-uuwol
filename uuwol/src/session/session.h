@@ -5,6 +5,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "../net/leases.h"
 #include "../transport/frame.h"
@@ -21,7 +22,6 @@
 
 struct uu_session_config {
 	const char *rid;
-	const char *mid;
 	const char *router_mac;
 	const char *model;
 	const char *hostname;
@@ -37,6 +37,8 @@ struct uu_session {
 	struct uu_frame_parser parser;
 	struct uloop_timeout echo_timer;
 	const struct uu_lease_snapshot *leases;
+	uint64_t mid_counter;
+	char current_mid[17];
 	uint8_t *pending;
 	size_t pending_length;
 	size_t pending_offset;

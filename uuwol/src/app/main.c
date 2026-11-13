@@ -86,7 +86,6 @@ int main(int argc, char **argv)
 	}
 	session_config = (struct uu_session_config){
 		.rid = "0000000000000000",
-		.mid = "0000000000000000",
 		.router_mac = mac,
 		.model = config.model,
 		.hostname = hostname,

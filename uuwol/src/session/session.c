@@ -2,7 +2,9 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <netinet/ether.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +25,13 @@
 
 static int session_send(struct uu_session *session, uint8_t *frame,
 			 size_t frame_length);
+
+static const char *session_next_mid(struct uu_session *session)
+{
+	snprintf(session->current_mid, sizeof(session->current_mid), "%016" PRIx64,
+		 session->mid_counter++);
+	return session->current_mid;
+}
 
 static int session_send_check_bound(struct uu_session *session)
 {
@@ -45,7 +54,7 @@ static int session_send_check_bound(struct uu_session *session)
 static int session_send_connect(struct uu_session *session)
 {
 	struct uu_message_connect connect = {
-		.mid = session->config.mid,
+		.mid = session_next_mid(session),
 		.type = UU_BUILD_ROUTER_TYPE,
 		.sn = session->config.router_mac,
 		.version = UU_BUILD_VERSION,
@@ -79,7 +88,7 @@ static int session_send_echo(struct uu_session *session)
 	size_t frame_length;
 
 	if (clock_gettime(CLOCK_REALTIME, &now)) return -1;
-	if (uu_message_encode_echo(session->config.mid, UU_SESSION_DEFAULT_TEXT,
+	if (uu_message_encode_echo(session_next_mid(session), UU_SESSION_DEFAULT_TEXT,
 				   UU_BUILD_ROUTER_TYPE,
 				   session->config.router_mac,
 				   (uint64_t)now.tv_sec,
@@ -129,7 +138,7 @@ static int session_send_device_list(struct uu_session *session)
 		free(devices);
 		return -1;
 	}
-	list.mid = session->config.mid;
+	list.mid = session_next_mid(session);
 	list.devices = devices;
 	list.device_count = session->leases->count;
 	list.router_type = UU_BUILD_ROUTER_TYPE;
@@ -348,7 +357,7 @@ static void session_tls_event(enum uu_tls_event event, void *context)
 int uu_session_init(struct uu_session *session,
 			    const struct uu_session_config *config)
 {
-	if (!session || !config || !config->mid || !config->router_mac || !config->model ||
+	if (!session || !config || !config->router_mac || !config->model ||
 	    !config->iface || !config->whoami)
 		return -1;
 	memset(session, 0, sizeof(*session));
