@@ -7,6 +7,7 @@
 #include <libubox/uloop.h>
 
 #include "../common/argv.h"
+#include "../common/helper.h"
 #include "../identity/whoami.h"
 #include "../local/router.h"
 #include "../net/refresh.h"
@@ -55,7 +56,7 @@ int main(int argc, char **argv)
 {
 	struct uu_cli config = { 0 };
 	struct uu_app app = { 0 };
-	char mac[18];
+	char mac[UU_MAC_TEXT_LENGTH];
 	char hostname[256];
 	struct uu_session_config session_config;
 	int result = 1;
@@ -71,7 +72,7 @@ int main(int argc, char **argv)
 		UU_LOG_ERR("gethostname failed\n");
 		goto cleanup;
 	}
-	if (uu_cli_mac_text(&config, mac, sizeof(mac))) {
+	if (uu_format_lower_mac(&config.mac, mac)) {
 		UU_LOG_ERR("could not format MAC\n");
 		goto cleanup;
 	}

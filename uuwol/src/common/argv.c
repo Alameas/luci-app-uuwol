@@ -77,10 +77,3 @@ int uu_cli_parse(int argc, char **argv, struct uu_cli *config)
 	if (optind != argc) return -1;
 	return has_mac && has_iface && has_model ? 0 : -1;
 }
-
-int uu_cli_mac_text(const struct uu_cli *config, char *buffer, size_t size)
-{
-	if (size < 18) return -1;
-	if (!ether_ntoa_r(&config->mac, buffer)) return -1;
-	return 0;
-}

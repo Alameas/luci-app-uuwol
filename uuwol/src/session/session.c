@@ -10,6 +10,7 @@
 
 #include <libubox/utils.h>
 
+#include "../common/helper.h"
 #include "../protocol/dump.h"
 #include "../protocol/helper.h"
 #include "../protocol/message.h"
@@ -91,7 +92,7 @@ static int session_send_echo(struct uu_session *session)
 static int session_send_device_list(struct uu_session *session)
 {
 	struct uu_message_device *devices;
-	char (*mac_text)[18];
+	char (*mac_text)[UU_MAC_TEXT_LENGTH];
 	struct uu_message_device_list list;
 	uint8_t *frame;
 	size_t frame_length;
@@ -112,7 +113,7 @@ static int session_send_device_list(struct uu_session *session)
 		mac_text = NULL;
 	}
 	for (size_t i = 0; i < session->leases->count; i++) {
-		if (!ether_ntoa_r(&session->leases->entries[i].mac, mac_text[i])) {
+		if (uu_format_lower_mac(&session->leases->entries[i].mac, mac_text[i])) {
 			free(devices);
 			return -1;
 		}

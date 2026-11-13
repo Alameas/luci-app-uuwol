@@ -15,6 +15,5 @@ struct uu_cli {
 };
 
 int uu_cli_parse(int argc, char **argv, struct uu_cli *config);
-int uu_cli_mac_text(const struct uu_cli *config, char *buffer, size_t size);
 
 #endif
