@@ -9,12 +9,16 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
+#include "../common/helper.h"
 #include "../runtime/log.h"
 #include "leases.h"
+#include "arp.h"
 
 struct uu_lease_query {
 	struct uu_lease_snapshot *snapshot;
+	int error;
 };
 
 static const struct blobmsg_policy response_policy[] = {
@@ -107,23 +111,75 @@ static void read_response(struct ubus_request *request, int type,
 	if (!message || !query || !query->snapshot) {
 		return;
 	}
-	blobmsg_parse(response_policy, ARRAY_SIZE(response_policy), values,
-		      blob_data(message),
-			      blob_len(message));
+	blobmsg_parse_attr(response_policy, ARRAY_SIZE(response_policy), values,
+			   message);
 	if (!values[0]) {
 		UU_LOG_WARN("dhcp response missing dhcp_leases\n");
 		return;
 	}
 	blobmsg_for_each_attr(lease, values[0], remaining) {
 		if (blobmsg_type(lease) != BLOBMSG_TYPE_TABLE) continue;
-		if (append_lease(query->snapshot, lease)) return;
+		if (append_lease(query->snapshot, lease)) {
+			query->error = -1;
+			return;
+		}
 	}
+}
+
+static void log_leases(const char *label,
+		       const struct uu_lease_snapshot *snapshot)
+{
+	char ip_text[INET_ADDRSTRLEN];
+	char mac_text[UU_MAC_TEXT_LENGTH];
+
+	UU_LOG_INFO("%s count=%zu\n", label, snapshot->count);
+	for (size_t i = 0; i < snapshot->count; i++) {
+		if (!inet_ntop(AF_INET, &snapshot->entries[i].ip, ip_text,
+			       sizeof(ip_text)) ||
+		    uu_format_lower_mac(&snapshot->entries[i].mac, mac_text)) {
+			UU_LOG_INFO("%s[%zu] invalid address\n", label, i);
+			continue;
+		}
+		UU_LOG_INFO("%s[%zu] ip=%s mac=%s hostname=%s\n", label, i,
+			    ip_text, mac_text, snapshot->entries[i].hostname);
+	}
+}
+
+static int filter_online_leases(const char *iface,
+				struct uu_lease_snapshot *snapshot)
+{
+	struct uu_arp_target *targets;
+	bool *online;
+	size_t output = 0;
+
+	if (!snapshot->count) return 0;
+	if (snapshot->count > SIZE_MAX / sizeof(*targets) ||
+	    snapshot->count > SIZE_MAX / sizeof(*online)) return -1;
+	targets = calloc_a(snapshot->count * sizeof(*targets), &online,
+			   snapshot->count * sizeof(*online));
+	if (!targets) return -1;
+	for (size_t i = 0; i < snapshot->count; i++) {
+		targets[i].ip = snapshot->entries[i].ip;
+		targets[i].mac = snapshot->entries[i].mac;
+	}
+	if (uu_arp_probe_all(iface, targets, snapshot->count, online)) {
+		free(targets);
+		return -1;
+	}
+	for (size_t i = 0; i < snapshot->count; i++) {
+		if (!online[i]) continue;
+		if (output != i) snapshot->entries[output] = snapshot->entries[i];
+		output++;
+	}
+	free(targets);
+	snapshot->count = output;
+	return 0;
 }
 
 int uu_lease_snapshot_query(const char *iface,
 				    struct uu_lease_snapshot *snapshot)
 {
-	struct uu_lease_query query;
+	struct uu_lease_query query = { 0 };
 	struct ubus_context *context;
 	struct blob_buf request = { 0 };
 	uint32_t object;
@@ -155,7 +211,18 @@ int uu_lease_snapshot_query(const char *iface,
 		uu_lease_snapshot_free(snapshot);
 		return -1;
 	}
-	UU_LOG_INFO("dhcp getDHCPLeases iface=%s count=%zu\n",
-		    iface, snapshot->count);
+	if (query.error) {
+		UU_LOG_ERR("dhcp lease parsing failed iface=%s\n", iface);
+		uu_lease_snapshot_free(snapshot);
+		return -1;
+	}
+	log_leases("dhcp leases", snapshot);
+	if (filter_online_leases(iface, snapshot)) {
+		UU_LOG_ERR("arp lease probe failed iface=%s\n", iface);
+		uu_lease_snapshot_free(snapshot);
+		return -1;
+	}
+	log_leases("arp online leases", snapshot);
+
 	return 0;
 }
