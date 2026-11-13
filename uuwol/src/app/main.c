@@ -8,6 +8,7 @@
 
 #include "../common/argv.h"
 #include "../identity/whoami.h"
+#include "../local/router.h"
 #include "../net/refresh.h"
 #include "../runtime/log.h"
 #include "../session/session.h"
@@ -30,9 +31,11 @@ static int read_hostname(char *hostname, size_t size)
 
 struct uu_app {
 	struct uu_lease_refresher refresher;
+	struct uu_router_server router_server;
 	struct uu_whoami_response whoami;
 	struct uu_session session;
 	bool refresher_ready;
+	bool router_ready;
 	bool session_ready;
 	bool uloop_ready;
 };
@@ -40,6 +43,7 @@ struct uu_app {
 static void app_cleanup(struct uu_app *app)
 {
 	if (!app) return;
+	if (app->router_ready) uu_router_server_free(&app->router_server);
 	if (app->refresher_ready) uu_lease_refresher_stop(&app->refresher);
 	if (app->session_ready) uu_session_free(&app->session);
 	uu_whoami_response_free(&app->whoami);
@@ -106,6 +110,11 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 	app.uloop_ready = true;
+	if (uu_router_server_init(&app.router_server, mac, config.iface)) {
+		goto cleanup;
+	}
+	app.router_ready = true;
+	if (uu_router_server_start(&app.router_server)) goto cleanup;
 	if (uu_session_start(&app.session)) {
 		UU_LOG_ERR("could not start control session\n");
 		goto cleanup;
