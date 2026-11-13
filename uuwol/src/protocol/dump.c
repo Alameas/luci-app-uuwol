@@ -54,9 +54,8 @@ static void log_hex(const char *prefix, const uint8_t *data, size_t length)
 		text[offset++] = '.';
 		text[offset++] = '.';
 		text[offset++] = '.';
-		text[offset] = '\0';
 	}
-	if (!length) text[0] = '\0';
+	text[offset] = '\0';
 
 	UU_LOG_INFO("%s%s len=%zu\n", prefix, text, length);
 }
