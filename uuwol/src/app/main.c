@@ -67,6 +67,7 @@ int main(int argc, char **argv)
 		result = 64;
 		goto cleanup;
 	}
+	uu_log_set_debug(config.debug);
 
 	if (read_hostname(hostname, sizeof(hostname))) {
 		UU_LOG_ERR("gethostname failed\n");

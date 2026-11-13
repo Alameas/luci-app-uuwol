@@ -5,6 +5,7 @@
 
 #include <net/if.h>
 #include <netinet/ether.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 struct uu_cli {
@@ -12,6 +13,7 @@ struct uu_cli {
 	char iface[IF_NAMESIZE];
 	char model[128];
 	unsigned refresh_interval;
+	bool debug;
 };
 
 int uu_cli_parse(int argc, char **argv, struct uu_cli *config);

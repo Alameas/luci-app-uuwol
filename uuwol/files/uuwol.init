@@ -10,9 +10,10 @@ PROG="/usr/sbin/uuwol"
 start_service() {
 	config_load "$CONF"
 
-	local enabled refresh_interval mac iface model
+	local enabled debug refresh_interval mac iface model
 	config_get_bool enabled config enabled 0
 	[ "$enabled" -eq 1 ] || return 0
+	config_get_bool debug config debug 0
 
 	refresh_interval="$(uci -q get uuwol.config.refresh_interval)"
 	[ -n "$refresh_interval" ] || refresh_interval=20
@@ -28,6 +29,7 @@ start_service() {
 		--iface "$iface" \
 		--model "$model" \
 		--refresh-interval "$refresh_interval"
+	[ "$debug" -eq 1 ] && procd_append_param command --debug
 	procd_set_param respawn
 	procd_set_param stdout 1
 	procd_set_param stderr 1

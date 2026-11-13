@@ -31,6 +31,7 @@ int uu_cli_parse(int argc, char **argv, struct uu_cli *config)
 		{ "iface", required_argument, NULL, 'i' },
 		{ "model", required_argument, NULL, 'd' },
 		{ "refresh-interval", required_argument, NULL, 'r' },
+		{ "debug", no_argument, NULL, 'g' },
 		{ NULL, 0, NULL, 0 },
 	};
 	struct ether_addr mac;
@@ -44,7 +45,7 @@ int uu_cli_parse(int argc, char **argv, struct uu_cli *config)
 	optind = 1;
 	opterr = 0;
 
-	while ((option = getopt_long(argc, argv, "m:i:d:r:", options, NULL)) != -1) {
+	while ((option = getopt_long(argc, argv, "m:i:d:r:g", options, NULL)) != -1) {
 		switch (option) {
 		case 'm':
 			if (!ether_aton_r(optarg, &mac)) return -1;
@@ -68,6 +69,9 @@ int uu_cli_parse(int argc, char **argv, struct uu_cli *config)
 			break;
 		case 'r':
 			if (parse_refresh_interval(optarg, &config->refresh_interval)) return -1;
+			break;
+		case 'g':
+			config->debug = true;
 			break;
 		default:
 			return -1;
